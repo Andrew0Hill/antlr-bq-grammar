@@ -39,7 +39,7 @@ where_statement : WHERE bool_expression;
 group_statement : GROUP BY ( (expr (',' expr)* ) | ROLLUP '(' expr (',' expr)* ')'  );
 having_statement : HAVING bool_expression;
 window_statement : WINDOW window_name AS '(' window_definition ')'; 
-order_clause : ORDER BY expr (ASC | DESC)? (expr (ASC | DESC))? ;
+order_clause : ORDER BY expr (ASC | DESC)? (',' expr (ASC | DESC))* ;
 limit_clause : LIMIT count (OFFSET skip_rows) ;
 unary_operator : '-' | '~' | NOT;
 expr : number
@@ -61,11 +61,15 @@ expr : number
 			| '<>' 
 			| NOT? LIKE 
 			| NOT? BETWEEN 
-			| NOT? IN 
-			)  expr
+			)  expr 
 	 | expr   IS NOT? S_NULL
 		    | IS NOT? TRUE
 		    | IS NOT? FALSE 
+	 | expr NOT? IN (
+		 				  ( '(' expr (',' expr)* ')')
+						|  query_statement
+						| UNNEST '(' array_expr ')'
+					) 
 	 | expr AND expr
 	 | expr OR expr
  	 | function_name '(' ((expr (',' expr)*) | '*') ')'
@@ -73,7 +77,7 @@ expr : number
 	 | '(' expr ')'
 	 | (table_expr '.' )? column_name
 	 ;
-cast_expr : CAST '(' expr AS datatype ')' ;
+cast_expr : CAST '(' expr AS datatype_name ')' ;
 except_statement : EXCEPT '(' column_name (',' column_name)* ')';
 replace_statement : REPLACE '(' expr (AS? alias_name)? (',' expr (AS? alias_name)* ) ')' ;
 join_type : INNER
@@ -88,20 +92,8 @@ set_op : UNION (ALL | DISTINCT)?
 	   | EXCEPT DISTINCT;
 using_clause : USING '(' join_name (',' join_name)* ')';
 field_path : ;
-datatype : INT64_T
-		 | FLOAT64_T
-		 | BOOL_T
-		 | STRING_T
-		 | BYTES_T
-		 | DATE_T
-		 | DATETIME_T
-		 | TIME_T
-		 | TIMESTAMP_T
-		 | ARRAY
-		 | SSTRUCT
-		 ;
-sstruct : SSTRUCT '<' datatype '>' ;
-array_expr : ARRAY'<'datatype'>';
+sstruct : SSTRUCT '<' datatype_name '>' ;
+array_expr : ARRAY'<' datatype_name '>';
 array_path : ;
 bool_expression : expr;
 window_name : ;
@@ -119,6 +111,7 @@ array_name : name;
 column_name : name;
 cte_name : name;
 dataset_name : name;
+datatype_name : name;
 function_name : name;
 join_name : name;
 member_name : name;
@@ -158,16 +151,6 @@ raw_string : RAW_STRING ;
 byte_string : BYTE_STRING ;
 raw_byte_string : RAW_BYTE_STRING ;
 
-// Data Types (Used in CAST calls)
-INT64_T : I N T '64' ;
-FLOAT64_T : F L O A T '64';
-BOOL_T : B O O L;
-STRING_T : S T R I N G ;
-BYTES_T : B Y T E S ;
-DATE_T : D A T E ;
-DATETIME_T : D A T E T I M E ;
-TIME_T : T I M E ;
-TIMESTAMP_T : T I M E S T A M P ;
 // ARRAY and STRUCT included in the list of BQ keywords instead of here
 QUOTE : '\'' ;
 DQOUTE : '"';
