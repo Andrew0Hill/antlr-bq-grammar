@@ -64,9 +64,11 @@ expr : number
 	 | expr AND expr
 	 | expr OR expr
  	 | function_name '(' ((expr (',' expr)*) | '*') ')'
+	 | cast_expr
 	 | '(' expr ')'
 	 | (table_expr '.' )? column_name
 	 ;
+cast_expr : CAST '(' expr AS datatype ')' ;
 except_statement : EXCEPT '(' column_name (',' column_name)* ')';
 replace_statement : REPLACE '(' expr (AS? alias_name)? (',' expr (AS? alias_name)* ) ')' ;
 join_type : INNER
@@ -82,8 +84,16 @@ set_op : UNION (ALL | DISTINCT)?
 using_clause : USING '(' join_name (',' join_name)* ')';
 field_path : ;
 datatype : INT64_T
-		 | FLOAT_T
-		 | sstruct
+		 | FLOAT64_T
+		 | BOOL_T
+		 | STRING_T
+		 | BYTES_T
+		 | DATE_T
+		 | DATETIME_T
+		 | TIME_T
+		 | TIMESTAMP_T
+		 | ARRAY
+		 | SSTRUCT
 		 ;
 sstruct : SSTRUCT '<' datatype '>' ;
 array_expr : ARRAY'<'datatype'>';
@@ -132,19 +142,27 @@ string : quoted_string | triple_quoted_string | raw_string | byte_string | raw_b
 // Quoted strings can be in single or double quotes. They can contain escaped quotes of the type
 // enclosing the string, or non escaped versions of the other type of quote. (A single quoted string can contain 
 // unescaped double quotes or escaped single quotes, etc) 
-quoted_string : '"' (~'"' | '\\' '"')* '"' 
-			  | '\'' (~'\'' | '\\' '\'' )* '\'' ;
+quoted_string : QUOTED_STRING;
 
-triple_quoted_string : QUOTE QUOTE QUOTE .*? ~'\\' QUOTE QUOTE QUOTE 
-					 | DQOUTE DQOUTE DQOUTE .*? ~'\\' DQOUTE DQOUTE DQOUTE ;
+triple_quoted_string : TRIPLE_QUOTED_STRING;
 
 raw_string : ('r' | 'R') (quoted_string | triple_quoted_string) ;
 byte_string : ('b' | 'B') (quoted_string | triple_quoted_string) ;
 raw_byte_string : RB (quoted_string | triple_quoted_string) ;
 
+// Data Types (Used in CAST calls)
 INT64_T : I N T '64' ;
-FLOAT_T : F L O A T ;
+FLOAT64_T : F L O A T '64';
+BOOL_T : B O O L;
 STRING_T : S T R I N G ;
+BYTES_T : B Y T E S ;
+DATE_T : D A T E ;
+DATETIME_T : D A T E T I M E ;
+TIME_T : T I M E ;
+TIMESTAMP_T : T I M E S T A M P ;
+// ARRAY and STRUCT included in the list of BQ keywords instead of her
+
+
 QUOTE : '\'' ;
 DQOUTE : '"';
 RB : [rR][bB] | [bB][rR] ;
@@ -257,6 +275,12 @@ WITHIN : W I T H I N ;
 WS : [ \t\r\n]+ -> skip ;
 // Comments
 CMT : '--' ~[\r\n]* -> skip ;
+M_CMT : '/*' .*? '*/' -> skip;
+// Quoted String
+QUOTED_STRING : '"' (~'"' | '\\' '"')* '"' 
+			  | '\'' (~'\'' | '\\' '\'' )* '\'' ;
+TRIPLE_QUOTED_STRING : QUOTE QUOTE QUOTE .*? ~'\\' QUOTE QUOTE QUOTE 
+					 | DQOUTE DQOUTE DQOUTE .*? ~'\\' DQOUTE DQOUTE DQOUTE ;
 // ID regex
 ID : [a-zA-Z_][-A-Za-z_0-9]* ;
 fragment DIGIT : [0-9] ;
