@@ -1,3 +1,9 @@
+/*
+* WIP BigQuery grammar for ANTLR v4
+* This grammar is designed to parse BigQuery SQL statements, and is based off of the BigQuery SQL syntax specified at:
+* https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax
+ */
+
 grammar bigquery; 
 // Root statement for a SELECT query
 query_statement : with_statement? query_expr;
@@ -38,7 +44,6 @@ limit_clause : LIMIT count (OFFSET skip_rows) ;
 unary_operator : '-' | '~' | NOT;
 expr : number
 	 | string
-	 | struct_name '.' member_name
 	 | array_name '[' (OFFSET | ORDINAL | SAFE_OFFSET | SAFE_ORDINAL ) '(' expr ')' ']'
 	 | unary_operator expr
 	 | expr ('*' | '/') expr
@@ -105,7 +110,7 @@ count : number;
 skip_rows : number;
 with_query_name : ;
 // WITH statement (CTE statement)			
-with_statement : WITH cte_name AS '(' query_expr (',' query_expr)* ')' ;
+with_statement : WITH cte_name AS '(' query_expr  ')' (',' cte_name AS '(' query_expr ')' )* ;
 name : ID | string | '"' name '"' | '(' name ')' | '`' name '`' | '\'' name '\'' ;
 // Name rules
 
@@ -137,18 +142,21 @@ FLOAT : ('+' | '-')? DIGITS '.' DIGITS? ('e' ('+' | '-') DIGITS)?
 DIGITS : DIGIT+ ;
 
 // STRING LITERAL
-string : quoted_string | triple_quoted_string | raw_string | byte_string | raw_byte_string;
+string : quoted_string 
+	   | triple_quoted_string 
+	   | raw_string 
+	   | byte_string 
+	   | raw_byte_string
+	   ;
 
 // Quoted strings can be in single or double quotes. They can contain escaped quotes of the type
 // enclosing the string, or non escaped versions of the other type of quote. (A single quoted string can contain 
 // unescaped double quotes or escaped single quotes, etc) 
 quoted_string : QUOTED_STRING;
-
-triple_quoted_string : TRIPLE_QUOTED_STRING;
-
-raw_string : ('r' | 'R') (quoted_string | triple_quoted_string) ;
-byte_string : ('b' | 'B') (quoted_string | triple_quoted_string) ;
-raw_byte_string : RB (quoted_string | triple_quoted_string) ;
+triple_quoted_string : TRIPLE_QUOTED_STRING; 
+raw_string : RAW_STRING ;
+byte_string : BYTE_STRING ;
+raw_byte_string : RAW_BYTE_STRING ;
 
 // Data Types (Used in CAST calls)
 INT64_T : I N T '64' ;
@@ -160,13 +168,15 @@ DATE_T : D A T E ;
 DATETIME_T : D A T E T I M E ;
 TIME_T : T I M E ;
 TIMESTAMP_T : T I M E S T A M P ;
-// ARRAY and STRUCT included in the list of BQ keywords instead of her
-
-
+// ARRAY and STRUCT included in the list of BQ keywords instead of here
 QUOTE : '\'' ;
 DQOUTE : '"';
-RB : [rR][bB] | [bB][rR] ;
-// BigQuery Keywords
+
+/*
+ * BigQuery Keywords:
+ * Based off the list of BigQuery Reserved Keywords at:
+ * https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical 
+ */
 ALL : A L L ;
 AND : A N D ;
 ANY : A N Y ;
@@ -281,8 +291,13 @@ QUOTED_STRING : '"' (~'"' | '\\' '"')* '"'
 			  | '\'' (~'\'' | '\\' '\'' )* '\'' ;
 TRIPLE_QUOTED_STRING : QUOTE QUOTE QUOTE .*? ~'\\' QUOTE QUOTE QUOTE 
 					 | DQOUTE DQOUTE DQOUTE .*? ~'\\' DQOUTE DQOUTE DQOUTE ;
+RAW_STRING : R (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
+BYTE_STRING : B (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
+RAW_BYTE_STRING : RB (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
+
 // ID regex
 ID : [a-zA-Z_][-A-Za-z_0-9]* ;
+RB : [rR][bB] | [bB][rR] ;
 fragment DIGIT : [0-9] ;
 // Fragments for each letter of the alphabet. This is necessary because SQL keywords are case-insensitive.
 fragment A : [aA];
