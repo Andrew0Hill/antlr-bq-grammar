@@ -8,13 +8,14 @@ grammar bigquery;
 // Root statement for a SELECT query
 query_statement : with_statement? query_expr;
 
-// Query Expression 
+// A Query Expression can contain a Select Statement, a parenthized Query Expression, or a set operation of two or more
+// Query Expressions
 query_expr : select_statement order_clause? limit_clause?
 		   | '(' query_expr ')' order_clause? limit_clause?
 		   | query_expr set_op query_expr order_clause? limit_clause?
 		   ;
 
-// Select statement 
+// A Select Statement can select from table columns w/wo aliases, wildcard expressions, or any other 'expr' (Like a function call)
 select_statement : SELECT (ALL | DISTINCT)? 
 					( ( expr?  '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) ( ',' ( ( expr?  '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) )*
 					from_statement?
@@ -23,8 +24,12 @@ select_statement : SELECT (ALL | DISTINCT)?
 					having_statement?
 					window_statement?;
 
+// From Statement can have one or more 'from_item's, separated by a comma
 from_statement : FROM from_item (',' from_item )* ;
 
+// From Item - WIP 
+// From Items can be table expressions (project.dataset.table, Query Statements (subqueries), or a valid array expression).
+// Array expressions are still WIP
 from_item : table_expr (AS? alias_name)?  (FOR SYSTEM TIME AS OF string)? 
 		  | from_item join_type? JOIN from_item (on_clause | using_clause)
 		  | '(' query_statement ')' (AS? alias_name)? 
@@ -32,16 +37,31 @@ from_item : table_expr (AS? alias_name)?  (FOR SYSTEM TIME AS OF string)?
 		  | UNNEST'(' array_expr ')' (AS? alias_name)? (WITH OFFSET (AS? alias_name))?
 		  | UNNEST'(' array_path ')' (AS? alias_name)? (WITH OFFSET (AS? alias_name))?
 		  | array_path (AS? alias_name)? (WITH OFFSET (AS? alias_name))? 
-		  | with_query_name (AS? alias_name)?;
+		  //| with_query_name (AS? alias_name)?
+		  ;
 
-
+// Where Statement can contain any boolean expression
 where_statement : WHERE bool_expression;
+
+// Group Statement can contain one or more expressions, separated by commas
 group_statement : GROUP BY ( (expr (',' expr)* ) | ROLLUP '(' expr (',' expr)* ')'  );
+
+// Having statement can contain a boolean expression (TODO: Can HAVING statement contain comma separated boolean expressions?)
 having_statement : HAVING bool_expression;
+
+// Window statement is not complete
 window_statement : WINDOW window_name AS '(' window_definition ')'; 
+
+// Order Statement can contain any number of comma separated expressions to order by.
 order_clause : ORDER BY expr (ASC | DESC)? (',' expr (ASC | DESC))* ;
-limit_clause : LIMIT count (OFFSET skip_rows) ;
+
+// Limit Statement can contain a limit number and an optional offset
+limit_clause : LIMIT count (OFFSET skip_rows)? ;
+
+// Unary Operators
 unary_operator : '-' | '~' | NOT;
+
+// Main expression rule can expand to any valid BigQuery expression. Still WIP
 expr : number
 	 | string
 	 | array_name '[' (OFFSET | ORDINAL | SAFE_OFFSET | SAFE_ORDINAL ) '(' expr ')' ']'
@@ -76,36 +96,70 @@ expr : number
 	 | cast_expr
 	 | '(' expr ')'
 	 | (table_expr '.' )? column_name
+	 | keyword
 	 ;
+
+// Cast Expression can cast any expression to one of the datatype_name options
 cast_expr : CAST '(' expr AS datatype_name ')' ;
+
+// Except Statement can exclude any number of comma separated column names.
 except_statement : EXCEPT '(' column_name (',' column_name)* ')';
+
+// Replace Statement can replace any number of optionally aliased, comma separated expressions.
 replace_statement : REPLACE '(' expr (AS? alias_name)? (',' expr (AS? alias_name)* ) ')' ;
+
+// Join Type rule can expand to be any type of JOIN keyword.
 join_type : INNER
 		  | CROSS
 		  | FULL OUTER?
 		  | LEFT OUTER?
 		  | RIGHT OUTER?
 		  ;
+
+// On Clause can contain a single boolean expression
 on_clause : ON bool_expression;
+
+// Set Operation expands to the keywords for each type of set operation
 set_op : UNION (ALL | DISTINCT)? 
 	   | INTERSECT DISTINCT
 	   | EXCEPT DISTINCT;
+
+// Using Clause expands to a comma separated list of names
 using_clause : USING '(' join_name (',' join_name)* ')';
+
+// Field path is WIP
 field_path : ;
+// Struct can be the struct keyword followed by a datatype name. TODO: Need to expand this to support multiple comma separated datatypes
 sstruct : SSTRUCT '<' datatype_name '>' ;
+// Array can be the Array keyword followed by a datatype name.
 array_expr : ARRAY'<' datatype_name '>';
+
+// Array path is WIP
 array_path : ;
+
+// Boolean expression can be any expression. (May change this later, but for now it works because we assume all queries are valid)
 bool_expression : expr;
+
+// Window name is WIP
 window_name : ;
+
+// Window Definition is WIP
 window_definition : ;
+
+// Count can be any number
 count : number;
+// Skip rows can be any number
 skip_rows : number;
-with_query_name : ;
+//with_query_name : ;
 // WITH statement (CTE statement)			
 with_statement : WITH cte_name AS '(' query_expr  ')' (',' cte_name AS '(' query_expr ')' )* ;
+
+// Name can be any ID or string, with optional quotes and parens
 name : ID | string | '"' name '"' | '(' name ')' | '`' name '`' | '\'' name '\'' ;
 // Name rules
 
+// Each specific type of name just expands to the parent name rule. This lets us assign handlers
+// to only a specific type of name. (i.e. we care about cte_names and column_names, but not about datatype_names)
 alias_name  : name; 
 array_name : name;
 column_name : name;
@@ -151,6 +205,109 @@ raw_string : RAW_STRING ;
 byte_string : BYTE_STRING ;
 raw_byte_string : RAW_BYTE_STRING ;
 
+keyword : ALL 
+		| AND 
+		| ANY 
+		| ARRAY 
+		| AS 
+		| ASC 
+		| ASSERT_ROWS_MODIFIED 
+		| AT 
+		| BETWEEN 
+		| BY 
+		| CASE 
+		| CAST 
+		| COLLATE 
+		| CONTAINS 
+		| CREATE 
+		| CROSS 
+		| CUBE 
+		| CURRENT 
+		| DEFAULT 
+		| DEFINE 
+		| DESC 
+		| DISTINCT 
+		| ELSE 
+		| END 
+		| ENUM 
+		| ESCAPE 
+		| EXCEPT 
+		| EXCLUDE 
+		| EXISTS 
+		| EXTRACT 
+		| FALSE 
+		| FETCH 
+		| FOLLOWING 
+		| FOR 
+		| FROM 
+		| FULL 
+		| GROUP 
+		| GROUPING 
+		| GROUPS 
+		| HASH 
+		| HAVING 
+		| IF 
+		| IGNORE 
+		| IN 
+		| INNER 
+		| INTERSECT 
+		| INTERVAL 
+		| INTO 
+		| IS 
+		| JOIN 
+		| LATERAL 
+		| LEFT 
+		| LIKE 
+		| LIMIT 
+		| LOOKUP 
+		| MERGE 
+		| NATURAL 
+		| NEW 
+		| NO 
+		| NOT 
+		| S_NULL 
+		| NULLS 
+		| OF 
+		| OFFSET 
+		| ON 
+		| OR 
+		| ORDER 
+		| ORDINAL 
+		| OUTER 
+		| OVER 
+		| PARTITION 
+		| PRECEDING 
+		| PROTO 
+		| RANGE 
+		| RECURSIVE 
+		| REPLACE 
+		| RESPECT 
+		| RIGHT 
+		| ROLLUP 
+		| ROWS 
+		| SAFE_OFFSET 
+		| SAFE_ORDINAL 
+		| SELECT 
+		| SET 
+		| SOME 
+		| SSTRUCT 
+		| SYSTEM 
+		| TABLESAMPLE 
+		| THEN 
+		| TIME 
+		| TO 
+		| TREAT 
+		| TRUE 
+		| UNBOUNDED 
+		| UNION 
+		| UNNEST 
+		| USING 
+		| WHEN 
+		| WHERE 
+		| WINDOW 
+		| WITH 
+		| WITHIN 
+		;
 // ARRAY and STRUCT included in the list of BQ keywords instead of here
 QUOTE : '\'' ;
 DQOUTE : '"';
