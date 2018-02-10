@@ -53,7 +53,7 @@ having_statement : HAVING bool_expression;
 window_statement : WINDOW window_name AS '(' window_definition ')'; 
 
 // Order Statement can contain any number of comma separated expressions to order by.
-order_clause : ORDER BY expr (ASC | DESC)? (',' expr (ASC | DESC))* ;
+order_clause : ORDER BY expr (ASC | DESC)? (',' expr (ASC | DESC)?)* ;
 
 // Limit Statement can contain a limit number and an optional offset
 limit_clause : LIMIT count (OFFSET skip_rows)? ;
@@ -80,11 +80,12 @@ expr : number
 			| '!=' 
 			| '<>' 
 			| NOT? LIKE 
-			| NOT? BETWEEN 
+			| NOT? BETWEEN expr AND expr
 			)  expr 
 	 | expr   IS NOT? S_NULL
 		    | IS NOT? TRUE
 		    | IS NOT? FALSE 
+	// TODO: Separate this out into separate STRUCT and ARRAY rules.
 	 | expr NOT? IN (
 		 				  ( '(' expr (',' expr)* ')')
 						|  query_statement
@@ -95,13 +96,16 @@ expr : number
  	 | function_name '(' ((expr (',' expr)*) | '*') ')'
 	 | cast_expr
 	 | '(' expr ')'
-	 | (table_expr '.' )? column_name
+	 | column_expr
 	 | keyword
 	 ;
 
 // Cast Expression can cast any expression to one of the datatype_name options
 cast_expr : CAST '(' expr AS datatype_name ')' ;
 
+column_expr : '`' column_expr '`'
+			| (((project_name '.')? dataset_name '.')? table_name '.')? column_name
+			;
 // Except Statement can exclude any number of comma separated column names.
 except_statement : EXCEPT '(' column_name (',' column_name)* ')';
 
@@ -155,7 +159,7 @@ skip_rows : number;
 with_statement : WITH cte_name AS '(' query_expr  ')' (',' cte_name AS '(' query_expr ')' )* ;
 
 // Name can be any ID or string, with optional quotes and parens
-name : ID | string | '"' name '"' | '(' name ')' | '`' name '`' | '\'' name '\'' ;
+name : ID | '"' name '"' | '(' name ')' | '`' name '`' | '\'' name '\'' ;
 // Name rules
 
 // Each specific type of name just expands to the parent name rule. This lets us assign handlers
@@ -174,9 +178,6 @@ struct_name : name;
 table_name : name;
 table_expr : (((project_name '.')? dataset_name '.')? table_name)
 		   | '`' table_expr '`';
-// Name is an identifier that may or may not be quoted.
-
-
 
 // NUMBER LITERALS
 number : integer_type | float_type ;
@@ -194,7 +195,9 @@ string : quoted_string
 	   | raw_string 
 	   | byte_string 
 	   | raw_byte_string
+	   | special_string
 	   ;
+
 
 // Quoted strings can be in single or double quotes. They can contain escaped quotes of the type
 // enclosing the string, or non escaped versions of the other type of quote. (A single quoted string can contain 
@@ -204,6 +207,11 @@ triple_quoted_string : TRIPLE_QUOTED_STRING;
 raw_string : RAW_STRING ;
 byte_string : BYTE_STRING ;
 raw_byte_string : RAW_BYTE_STRING ;
+// Special strings are strings with DATE, DATETIME, TIME, or TIMESTAMP preceding the string.
+// These keywords are not reserved keywords, which means that they can be used as identifiers without 
+// backticks.
+special_string : datatype_name QUOTED_STRING;
+
 
 keyword : ALL 
 		| AND 
@@ -434,7 +442,6 @@ TRIPLE_QUOTED_STRING : QUOTE QUOTE QUOTE .*? ~'\\' QUOTE QUOTE QUOTE
 RAW_STRING : R (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
 BYTE_STRING : B (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
 RAW_BYTE_STRING : RB (QUOTED_STRING | TRIPLE_QUOTED_STRING) ;
-
 // ID regex
 ID : [a-zA-Z_][-A-Za-z_0-9]* ;
 RB : [rR][bB] | [bB][rR] ;
