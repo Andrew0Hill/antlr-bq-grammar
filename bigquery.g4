@@ -17,7 +17,7 @@ query_expr : select_statement order_clause? limit_clause?
 
 // A Select Statement can select from table columns w/wo aliases, wildcard expressions, or any other 'expr' (Like a function call)
 select_statement : SELECT (ALL | DISTINCT)? 
-					( ( expr?  '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) ( ',' ( ( expr?  '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) )*
+					( ( expr? '.'? '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) ( ',' ( ( expr?  '*' (except_statement)? (replace_statement)? ) | expr (AS? alias_name)? ) )*
 					from_statement?
 					where_statement?
 					group_statement? 
